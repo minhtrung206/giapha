@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cây Phả Hệ Tộc Lê</title>
+  
+  <!-- Các thư viện cần thiết cho D3 Org Chart -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3"></script>
+  <!-- Driver kết nối Neo4j -->
   <script src="https://cdn.jsdelivr.net/npm/neo4j-driver"></script>
 
   <style>
@@ -68,7 +72,6 @@
   <div class="chart-container" id="tree-container"></div>
 
   <script>
-    // Cấu hình chuẩn xác theo file txt của bạn
     const NEO4J_URI = "neo4j+s://c8d22f23.databases.neo4j.io";
     const NEO4J_USERNAME = "c8d22f23";
     const NEO4J_PASSWORD = "qsrjpGHpJ5RWSgiJV0_C45jiWUPC1HeSswk_hwokHxo";
@@ -95,7 +98,6 @@
 
         const result = await session.run(cypherQuery);
         
-        // Khử trùng lặp và gom cặp vợ chồng
         const nodeMap = new Map();
         result.records.forEach(r => {
           const id = r.get("id");
@@ -120,7 +122,6 @@
 
         const data = Array.from(nodeMap.values());
 
-        // Kiểm tra tính toàn vẹn liên kết cha-con
         const allIds = new Set(data.map(d => d.id));
         data.forEach(d => {
           if (d.parentId && !allIds.has(d.parentId)) {
@@ -128,7 +129,6 @@
           }
         });
 
-        // Đảm bảo node gốc '1' là đỉnh cây
         let rootNode = data.find(d => d.id === "1");
         if (rootNode) {
           rootNode.parentId = null;
@@ -145,7 +145,7 @@
           return;
         }
 
-        // Vẽ sơ đồ cây
+        // Khởi tạo đồ thị phân cấp
         new d3.OrgChart()
           .container('#tree-container')
           .data(data)
