@@ -13,21 +13,23 @@
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #f0f2f5;
+      background-color: #f4f6f9;
       overflow: hidden;
     }
-    #loading {
+    #status-msg {
       position: absolute;
-      top: 50%;
+      top: 20px;
       left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 16px;
+      transform: translateX(-50%);
+      z-index: 9999;
+      font-size: 15px;
       font-weight: 500;
       color: #1a365d;
-      background: white;
-      padding: 16px 24px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      background: #ffffff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      border: 1px solid #cbd5e0;
     }
     .chart-container {
       width: 100vw;
@@ -37,9 +39,9 @@
       background: #ffffff;
       border: 1.5px solid #2b6cb0;
       border-radius: 8px;
-      padding: 8px 12px;
+      padding: 8px 10px;
       text-align: center;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -47,9 +49,10 @@
       box-sizing: border-box;
     }
     .node-id {
-      font-size: 10px;
+      font-size: 11px;
+      font-weight: bold;
       color: #718096;
-      margin-bottom: 2px;
+      margin-bottom: 3px;
     }
     .node-title {
       font-size: 13px;
@@ -61,17 +64,19 @@
 </head>
 <body>
 
-  <div id="loading">Đang tải dữ liệu gia phả...</div>
+  <div id="status-msg">Đang tải dữ liệu gia phả từ máy chủ...</div>
   <div class="chart-container" id="tree-container"></div>
 
   <script>
+    // Cấu hình chuẩn xác theo file txt của bạn
     const NEO4J_URI = "neo4j+s://c8d22f23.databases.neo4j.io";
-    const NEO4J_USER = "c8d22f23";
+    const NEO4J_USERNAME = "c8d22f23";
     const NEO4J_PASSWORD = "qsrjpGHpJ5RWSgiJV0_C45jiWUPC1HeSswk_hwokHxo";
     const NEO4J_DATABASE = "c8d22f23";
 
     async function loadFamilyTree() {
-      const driver = neo4j.driver(NEO4J_URI, neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD));
+      const statusEl = document.getElementById("status-msg");
+      const driver = neo4j.driver(NEO4J_URI, neo4j.auth.basic(NEO4J_USERNAME, NEO4J_PASSWORD));
       const session = driver.session({ database: NEO4J_DATABASE });
 
       try {
@@ -80,25 +85,67 @@
           WHERE p.id STARTS WITH '1' AND NOT p.id ENDS WITH 'A' AND NOT p.id ENDS WITH 'B'
           OPTIONAL MATCH (p)-[:VO_CHONG]->(sp:Person)
           OPTIONAL MATCH (parent:Person)-[:CHA_ME_CON]->(p)
-          WHERE NOT parent.id ENDS WITH 'A' AND NOT parent.id ENDS WITH 'B'
+          WHERE parent.id STARTS WITH '1' AND NOT parent.id ENDS WITH 'A' AND NOT parent.id ENDS WITH 'B'
           RETURN p.id AS id,
                  parent.id AS parentId,
-                 CASE 
-                   WHEN sp IS NOT NULL THEN p.name + ' & ' + sp.name 
-                   ELSE p.name 
-                 END AS name
+                 p.name AS personName,
+                 sp.name AS spouseName
           ORDER BY p.id;
         `;
 
         const result = await session.run(cypherQuery);
-        const data = result.records.map(record => ({
-          id: record.get("id"),
-          parentId: record.get("parentId"),
-          name: record.get("name")
-        }));
+        
+        // Khử trùng lặp và gom cặp vợ chồng
+        const nodeMap = new Map();
+        result.records.forEach(r => {
+          const id = r.get("id");
+          const parentId = r.get("parentId");
+          const pName = r.get("personName") || "";
+          const spName = r.get("spouseName");
+          const fullName = spName ? `${pName} & ${spName}` : pName;
 
-        document.getElementById("loading").style.display = "none";
+          if (!nodeMap.has(id)) {
+            nodeMap.set(id, {
+              id: id,
+              parentId: parentId || null,
+              name: fullName
+            });
+          } else {
+            const existing = nodeMap.get(id);
+            if (!existing.parentId && parentId) {
+              existing.parentId = parentId;
+            }
+          }
+        });
 
+        const data = Array.from(nodeMap.values());
+
+        // Kiểm tra tính toàn vẹn liên kết cha-con
+        const allIds = new Set(data.map(d => d.id));
+        data.forEach(d => {
+          if (d.parentId && !allIds.has(d.parentId)) {
+            d.parentId = null;
+          }
+        });
+
+        // Đảm bảo node gốc '1' là đỉnh cây
+        let rootNode = data.find(d => d.id === "1");
+        if (rootNode) {
+          rootNode.parentId = null;
+        }
+
+        data.forEach(d => {
+          if (d.id !== "1" && d.parentId === null) {
+            d.parentId = "1";
+          }
+        });
+
+        if (data.length === 0) {
+          statusEl.innerText = "Không tìm thấy dữ liệu phả hệ.";
+          return;
+        }
+
+        // Vẽ sơ đồ cây
         new d3.OrgChart()
           .container('#tree-container')
           .data(data)
@@ -118,9 +165,12 @@
           .render()
           .expandAll();
 
+        statusEl.style.display = "none";
+
       } catch (error) {
         console.error(error);
-        document.getElementById("loading").innerText = "Lỗi kết nối: " + error.message;
+        statusEl.innerText = "Lỗi kết nối: " + error.message;
+        statusEl.style.color = "red";
       } finally {
         await session.close();
         await driver.close();
