@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cây Phả Hệ Tộc Lê</title>
   
-  <!-- Các thư viện cần thiết cho D3 Org Chart -->
+  <!-- Thư viện cần thiết -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3"></script>
-  <!-- Driver kết nối Neo4j -->
   <script src="https://cdn.jsdelivr.net/npm/neo4j-driver"></script>
 
   <style>
@@ -43,7 +42,7 @@
       background: #ffffff;
       border: 1.5px solid #2b6cb0;
       border-radius: 8px;
-      padding: 8px 10px;
+      padding: 6px 10px;
       text-align: center;
       box-shadow: 0 2px 5px rgba(0,0,0,0.08);
       display: flex;
@@ -53,16 +52,16 @@
       box-sizing: border-box;
     }
     .node-id {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: bold;
       color: #718096;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
     .node-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #1a202c;
-      line-height: 1.3;
+      line-height: 1.25;
     }
   </style>
 </head>
@@ -145,15 +144,15 @@
           return;
         }
 
-        // Khởi tạo đồ thị phân cấp
+        // Vẽ sơ đồ cây theo hàng ngang chuẩn gia phả
         new d3.OrgChart()
           .container('#tree-container')
           .data(data)
+          .compact(false) // Dàn đều tất cả các con trên 1 hàng ngang
           .nodeHeight(d => 65)
-          .nodeWidth(d => 210)
-          .childrenMargin(d => 35)
-          .compactMarginBetween(d => 20)
-          .compactMarginPair(d => 25)
+          .nodeWidth(d => 190)
+          .childrenMargin(d => 45)
+          .siblingsMargin(d => 25)
           .nodeContent(function(d) {
             return `
               <div class="node-card" style="width:${d.width}px; height:${d.height}px;">
@@ -169,7 +168,7 @@
 
       } catch (error) {
         console.error(error);
-        statusEl.innerText = "Lỗi kết nối: " + error.message;
+        statusEl.innerText = "Lỗi hiển thị: " + error.message;
         statusEl.style.color = "red";
       } finally {
         await session.close();
