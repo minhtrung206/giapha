@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cây Phả Hệ Tộc Lê</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f0f2f5;
+      overflow: hidden;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 16px;
+      font-weight: 500;
+      color: #1a365d;
+      background: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .chart-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    .node-card {
+      background: #ffffff;
+      border: 1.5px solid #2b6cb0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    .node-id {
+      font-size: 10px;
+      color: #718096;
+      margin-bottom: 2px;
+    }
+    .node-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a202c;
+      line-height: 1.3;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading">Đang tải dữ liệu gia phả...</div>
+  <div class="chart-container" id="tree-container"></div>
+
+  <script>
+    const NEO4J_URI = "neo4j+s://c8d22f23.databases.neo4j.io";
+    const NEO4J_USER = "neo4j";
+    const NEO4J_PASSWORD = "qsrjpGHpJ5RWSgiJV0_C45jiWUPC1HeSswk_hwokHxo"; // <-- Thay mật khẩu của bạn vào đây
+
+    async function loadFamilyTree() {
+      const driver = neo4j.driver(NEO4J_URI, neo4j.auth.basic(NEO4J_USER, NEO4J_PASSWORD));
+      const session = driver.session();
+
+      try {
+        const cypherQuery = `
+          MATCH (p:Person)
+          WHERE p.id STARTS WITH '1' AND NOT p.id ENDS WITH 'A' AND NOT p.id ENDS WITH 'B'
+          OPTIONAL MATCH (p)-[:VO_CHONG]->(sp:Person)
+          OPTIONAL MATCH (parent:Person)-[:CHA_ME_CON]->(p)
+          WHERE NOT parent.id ENDS WITH 'A' AND NOT parent.id ENDS WITH 'B'
+          RETURN p.id AS id,
+                 parent.id AS parentId,
+                 CASE 
+                   WHEN sp IS NOT NULL THEN p.name + ' & ' + sp.name 
+                   ELSE p.name 
+                 END AS name
+          ORDER BY p.id;
+        `;
+
+        const result = await session.run(cypherQuery);
+        const data = result.records.map(record => ({
+          id: record.get("id"),
+          parentId: record.get("parentId"),
+          name: record.get("name")
+        }));
+
+        document.getElementById("loading").style.display = "none";
+
+        new d3.OrgChart()
+          .container('#tree-container')
+          .data(data)
+          .nodeHeight(d => 65)
+          .nodeWidth(d => 210)
+          .childrenMargin(d => 35)
+          .compactMarginBetween(d => 20)
+          .compactMarginPair(d => 25)
+          .nodeContent(function(d) {
+            return `
+              <div class="node-card" style="width:${d.width}px; height:${d.height}px;">
+                <div class="node-id">Mã: ${d.data.id}</div>
+                <div class="node-title">${d.data.name}</div>
+              </div>
+            `;
+          })
+          .render()
+          .expandAll();
+
+      } catch (error) {
+        console.error(error);
+        document.getElementById("loading").innerText = "Lỗi kết nối: " + error.message;
+      } finally {
+        await session.close();
+        await driver.close();
+      }
+    }
+
+    loadFamilyTree();
+  </script>
+</body>
+</html>
