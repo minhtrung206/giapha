@@ -144,15 +144,16 @@
           return;
         }
 
-        // Vẽ sơ đồ cây theo hàng ngang chuẩn gia phả
+        // Vẽ sơ đồ cây từ trái qua phải
         new d3.OrgChart()
           .container('#tree-container')
           .data(data)
-          .compact(false) // Dàn đều tất cả các con trên 1 hàng ngang
-          .nodeHeight(d => 65)
-          .nodeWidth(d => 190)
-          .childrenMargin(d => 45)
-          .siblingsMargin(d => 25)
+          .layout('left') // Chuyển bố cục sang chiều ngang (Trái -> Phải)
+          .compact(false)
+          .nodeHeight(d => 60)
+          .nodeWidth(d => 200)
+          .childrenMargin(d => 50)
+          .siblingsMargin(d => 20)
           .nodeContent(function(d) {
             return `
               <div class="node-card" style="width:${d.width}px; height:${d.height}px;">
